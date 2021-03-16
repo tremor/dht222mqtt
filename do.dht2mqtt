@@ -1,0 +1,43 @@
+#!/usr/local/bin/python
+# -*- coding: iso-8859-15 -*-
+import os, sys
+import paho.mqtt.client as mqtt
+import time
+import sys
+import Adafruit_DHT
+
+time.sleep(10) #Sleep to allow wireless to connect before starting MQTT
+
+server = "MQTT_SERVER"
+username = "MQTT_USERNAME"
+password = "MQTT_PASSWORD"
+clientid = "CLIENT_ID"
+dht_pin = 2  #GPIO pin Number (not physical pin number)
+
+mqttc = mqtt.Client(client_id=clientid)
+mqttc.username_pw_set(username, password=password)
+mqttc.connect(server , port=1883, keepalive=60)
+mqttc.loop_start()
+
+topic_dht22_temp = clientid + "/temperature"
+topic_dht22_humidity = clientid + "/humidity"
+HA_topic_temp = "homeassistant/sensor/" + clientid + "_0/config"
+HA_topic_humid = "homeassistant/sensor/" + clientid + "_1/config"
+HA_config_temp = "{\"name\":\"" + clientid + "_temperature\",\"state_topic\":\"" + clientid + "/temperature\",\"unit_of_measurement\":\"°C\",\"uniq_id\":\"" + clientid + "_temperature_0\",\"device\":{\"identifiers\":[\"" + clientid + "\"],\"name\":\"" + clientid + "\",\"sw_version\":\"" + clientid + "\",\"manufacturer\":\"RaspberryPi Foundation\",\"model\":\"RaspberryPi3\"}}"
+HA_config_humid = "{\"name\":\"" + clientid + "_humidity\",\"state_topic\":\"" + clientid + "/humidity\",\"unit_of_measurement\":\"%\",\"uniq_id\":\"" + clientid + "_humidity_1\",\"device\":{\"identifiers\":[\"" + clientid + "\"],\"name\":\"" + clientid + "\",\"sw_version\":\"" + clientid + "\",\"manufacturer\":\"RaspberryPi Foundation\",\"model\":\"RaspberryPi3\"}}"
+
+while True:
+    try:
+        humidity22, temp22 = Adafruit_DHT.read_retry(22, dht_pin)
+        mqttc.publish(HA_topic_humid, HA_config_humid, retain=True)
+        mqttc.publish(HA_topic_temp, HA_config_temp, retain=True)
+        if temp22 is not None:
+            temp22 = str(temp22)
+            mqttc.publish(topic_dht22_temp, payload=temp22, retain=True)
+        if humidity22 is not None:
+            humidity22 = str(humidity22)
+            mqttc.publish(topic_dht22_humidity, payload=humidity22, retain=True)
+        time.sleep(5)
+    except (EOFError, SystemExit, KeyboardInterrupt):
+        mqttc.disconnect()
+        sys.exit()
